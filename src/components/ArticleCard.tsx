@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Copy, Check, Bookmark, Share2, Globe, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { ExternalLink, Copy, Check, Bookmark, Share2, Globe, Tag, ChevronDown, ChevronUp, Award, Lightbulb } from 'lucide-react';
 import { Article } from '../types.ts';
 import { formatSingleArticleMarkdown } from '../utils/markdown.ts';
 
@@ -49,32 +49,39 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     }
   };
 
-  // Extract hostname for cleaner display
-  let domain = article.source;
-  try {
-    if (article.url.startsWith('http')) {
-      const parsed = new URL(article.url);
-      domain = parsed.hostname.replace('www.', '');
-    }
-  } catch {
-    // keep source
-  }
+  // Clean title
+  const cleanTitle = article.title.replace(/^📌\s*/, '').trim();
+
+  // Score styling
+  const score = article.importanceScore ?? (98 - index * 3);
+  const scoreColor =
+    index === 0
+      ? 'bg-rose-50 text-rose-700 border-rose-200'
+      : index === 1
+      ? 'bg-amber-50 text-amber-700 border-amber-200'
+      : 'bg-emerald-50 text-emerald-700 border-emerald-200';
 
   return (
     <article className="group bg-white rounded-2xl border border-slate-200/90 hover:border-slate-300 shadow-xs hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col justify-between">
-      {/* Card Header: Rank & Source Meta */}
+      {/* Card Header */}
       <div className="p-4 sm:p-5 pb-3">
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Rank badge */}
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-slate-900 text-white font-bold text-xs tracking-tight">
-              #{index + 1}
+            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-slate-900 text-white font-bold text-xs tracking-tight">
+              Top #{index + 1}
+            </span>
+
+            {/* Importance Score Badge */}
+            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md border ${scoreColor}`}>
+              <Award className="w-3 h-3" />
+              중요도 {score}점
             </span>
 
             {/* Source badge */}
             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200/60">
               <Globe className="w-3 h-3 text-slate-400" />
-              {article.source || domain}
+              {article.source}
             </span>
 
             {/* Category tag */}
@@ -113,8 +120,19 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
         {/* 📌 Article Title */}
         <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug group-hover:text-indigo-950 transition-colors">
           <span className="text-indigo-600 mr-1.5 font-bold">📌</span>
-          {article.title.replace(/^📌\s*/, '')}
+          {cleanTitle}
         </h3>
+
+        {/* 💡 Importance Reason from Flash-Lite */}
+        {article.importanceReason && (
+          <div className="mt-2.5 px-3 py-2 bg-indigo-50/50 rounded-lg border border-indigo-100/70 text-xs text-indigo-900 flex items-start gap-1.5">
+            <Lightbulb className="w-3.5 h-3.5 text-indigo-600 mt-0.5 shrink-0" />
+            <div>
+              <span className="font-semibold text-indigo-950">선정 사유: </span>
+              <span className="text-indigo-800">{article.importanceReason}</span>
+            </div>
+          </div>
+        )}
 
         {/* 📝 Core Summary */}
         <div className="mt-3.5 pt-3 border-t border-slate-100/90">

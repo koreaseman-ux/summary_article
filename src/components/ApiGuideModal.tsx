@@ -76,13 +76,22 @@ Google Search 도구를 사용하여 "\${keyword}" 관련 최신 신뢰성 높�
   ]
 }\`;
 
-    // 3. Google Search Grounding 도구 적용 호출
+    // 2. 실시간 웹 기사 검색 (Google News RSS 등)
+    const webArticles = await searchWebNews(keyword);
+
+    // 3. Flash-Lite LLM (gemini-3.1-flash-lite)을 통한 내용 중요도 평가 및 선별
+    const prompt = \`사용자 키워드: "\${keyword}"
+실시간 웹 검색 수집 기사:
+\${JSON.stringify(webArticles.slice(0, 10), null, 2)}
+
+지침:
+1. 기사들의 내용을 심층 분석하여 "\${keyword}"와의 핵심 연관성 및 산업/기술 파급력을 기준으로 "내용 중요도"를 평가하세요.
+2. 가장 중요한 핵심 기사 3건을 선별하세요.
+3. 각 기사별로 📌 제목, 📝 3~4문장 핵심 요약, 💡 중요도 점수(1~100) 및 선정 이유, 🔗 실제 원문 URL을 JSON으로 반환하세요.\`;
+
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }], // 실시간 구글 웹 검색 연동!
-      },
     });
 
     const text = response.text || '{}';
