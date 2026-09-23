@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   Clock,
   Award,
-  Cpu
+  Cpu,
+  Smartphone
 } from 'lucide-react';
 import { Header } from './components/Header.tsx';
 import { SearchSection } from './components/SearchSection.tsx';
@@ -21,6 +22,7 @@ import { ArticleCard } from './components/ArticleCard.tsx';
 import { MarkdownView } from './components/MarkdownView.tsx';
 import { ApiGuideModal } from './components/ApiGuideModal.tsx';
 import { BookmarksDrawer } from './components/BookmarksDrawer.tsx';
+import { MobileConnectModal } from './components/MobileConnectModal.tsx';
 import { Toast } from './components/Toast.tsx';
 import { CurationData, Article, BookmarkArticle } from './types.ts';
 import { generateFullMarkdown } from './utils/markdown.ts';
@@ -117,6 +119,7 @@ export default function App() {
   // UI modal toggles
   const [isApiGuideOpen, setIsApiGuideOpen] = useState<boolean>(false);
   const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
+  const [isMobileConnectOpen, setIsMobileConnectOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
 
@@ -252,6 +255,7 @@ export default function App() {
       <Header
         onOpenApiGuide={() => setIsApiGuideOpen(true)}
         onOpenBookmarks={() => setIsBookmarksOpen(true)}
+        onOpenMobileConnect={() => setIsMobileConnectOpen(true)}
         bookmarkCount={bookmarks.length}
       />
 
@@ -269,6 +273,24 @@ export default function App() {
           <p className="text-xs sm:text-sm text-slate-500 max-w-xl mx-auto">
             원하는 주제를 입력하면 최신 웹 기사를 실시간 수집하고, <strong>Flash-Lite LLM</strong>이 내용 중요도를 정밀 평가하여 가장 가치 있는 3건의 3문장 요약과 원문 링크를 제공합니다.
           </p>
+        </div>
+
+        {/* Quick Mobile Test Notice Banner */}
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs text-indigo-900">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded-md bg-indigo-600 text-white shrink-0">
+              <Smartphone className="w-3.5 h-3.5" />
+            </span>
+            <span>
+              <strong>스마트폰 테스트:</strong> 모바일 기기 브라우저나 카메라로 바로 접속하여 사용하실 수 있습니다.
+            </span>
+          </div>
+          <button
+            onClick={() => setIsMobileConnectOpen(true)}
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-indigo-100/60 font-semibold text-indigo-700 border border-indigo-200 rounded-lg shadow-2xs transition-colors"
+          >
+            모바일 QR / 링크 열기
+          </button>
         </div>
 
         {/* Search Bar Section */}
@@ -547,6 +569,13 @@ export default function App() {
           setBookmarks([]);
           showToast('보관함이 비워졌습니다.');
         }}
+        onNotify={showToast}
+      />
+
+      {/* Mobile Connect Modal */}
+      <MobileConnectModal
+        isOpen={isMobileConnectOpen}
+        onClose={() => setIsMobileConnectOpen(false)}
         onNotify={showToast}
       />
 
