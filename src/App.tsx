@@ -12,9 +12,7 @@ import {
   Search,
   CheckCircle2,
   Clock,
-  Award,
-  Cpu,
-  Smartphone
+  Award
 } from 'lucide-react';
 import { Header } from './components/Header.tsx';
 import { SearchSection } from './components/SearchSection.tsx';
@@ -261,38 +259,6 @@ export default function App() {
 
       {/* Main Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 pt-5 sm:pt-8 space-y-6">
-        {/* Hero Section */}
-        <div className="text-center space-y-2.5 py-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-            <Cpu className="w-3.5 h-3.5 text-indigo-600" />
-            <span>실시간 웹 검색 &amp; Flash-Lite 중요도 평가 엔진 (3.5/3.1 Flash-Lite)</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            관심 키워드 웹 검색 &amp; 중요도 Top 3 뉴스 요약
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 max-w-xl mx-auto">
-            원하는 주제를 입력하면 최신 웹 기사를 실시간 수집하고, <strong>Flash-Lite LLM</strong>이 내용 중요도를 정밀 평가하여 가장 가치 있는 3건의 3문장 요약과 원문 링크를 제공합니다.
-          </p>
-        </div>
-
-        {/* Quick Mobile Test Notice Banner */}
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs text-indigo-900">
-          <div className="flex items-center gap-2">
-            <span className="p-1 rounded-md bg-indigo-600 text-white shrink-0">
-              <Smartphone className="w-3.5 h-3.5" />
-            </span>
-            <span>
-              <strong>스마트폰 테스트:</strong> 모바일 기기 브라우저나 카메라로 바로 접속하여 사용하실 수 있습니다.
-            </span>
-          </div>
-          <button
-            onClick={() => setIsMobileConnectOpen(true)}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-indigo-100/60 font-semibold text-indigo-700 border border-indigo-200 rounded-lg shadow-2xs transition-colors"
-          >
-            모바일 QR / 링크 열기
-          </button>
-        </div>
-
         {/* Search Bar Section */}
         <SearchSection
           onSearch={handleSearch}
