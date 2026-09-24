@@ -5,59 +5,102 @@ import { GoogleGenAI } from "@google/genai";
 dotenv.config();
 async function searchWebNews(keyword) {
   const articles = [];
+  const cleanKeyword = keyword.trim();
   try {
-    const urls = [
-      `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`,
-      `https://news.google.com/rss/search?q=${encodeURIComponent(keyword + " \uB274\uC2A4")}&hl=ko&gl=KR&ceid=KR:ko`
-    ];
-    let xml = "";
-    for (const feedUrl of urls) {
-      try {
-        const resp = await fetch(feedUrl, {
-          signal: AbortSignal.timeout(5e3),
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-          }
-        });
-        if (resp.ok) {
-          xml = await resp.text();
-          if (xml && xml.includes("<item>")) break;
-        }
-      } catch (fetchErr) {
-        console.warn("Feed fetch warning:", fetchErr);
+    const daumUrl = `https://search.daum.net/search?w=news&q=${encodeURIComponent(cleanKeyword)}&DA=STC`;
+    const resp = await fetch(daumUrl, {
+      signal: AbortSignal.timeout(6e3),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
       }
-    }
-    if (!xml) return articles;
-    const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
-    for (const match of itemMatches.slice(0, 15)) {
-      const itemXml = match[1];
-      const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
-      const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
-      const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
-      const sourceMatch = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/);
-      const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
-      if (titleMatch && linkMatch) {
-        let cleanTitle = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
-        let sourceName = sourceMatch ? sourceMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").trim() : "";
-        if (!sourceName && cleanTitle.includes(" - ")) {
-          const parts = cleanTitle.split(" - ");
-          sourceName = parts.pop() || "";
-          cleanTitle = parts.join(" - ");
+    });
+    if (resp.ok) {
+      const html = await resp.text();
+      const liMatches = [...html.matchAll(/<li[^>]*data-docid="([^"]+)"[\s\S]*?<\/li>/g)];
+      for (const match of liMatches.slice(0, 10)) {
+        const block = match[0];
+        const titleMatch = block.match(/<div class="item-title">[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+        if (!titleMatch) continue;
+        let link = titleMatch[1];
+        if (link.startsWith("http://")) link = link.replace("http://", "https://");
+        const title = titleMatch[2].replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#39;/g, "'").trim();
+        const writerMatch = block.match(/class="item-writer"[^>]*>([\s\S]*?)<\/a>/i);
+        const source = writerMatch ? writerMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+        const descMatch = block.match(/class="conts-desc[^"]*"[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
+        const desc = descMatch ? descMatch[1].replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&#39;/g, "'").trim() : "";
+        const timeMatch = block.match(/class="gem-subinfo"[\s\S]*?class="txt_info"[^>]*>([\s\S]*?)<\/span>/i);
+        const pubDate = timeMatch ? timeMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+        if (title && link.startsWith("http")) {
+          articles.push({
+            title,
+            link,
+            source: source || "\uC8FC\uC694 \uC5B8\uB860",
+            pubDate,
+            description: desc
+          });
         }
-        const rawLink = linkMatch[1].trim();
-        const rawPubDate = pubDateMatch ? pubDateMatch[1].trim() : "";
-        const rawDesc = descMatch ? descMatch[1].replace(/<[^>]+>/g, " ").replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim() : "";
-        articles.push({
-          title: cleanTitle,
-          link: rawLink,
-          pubDate: rawPubDate,
-          source: sourceName || "\uC8FC\uC694 \uC5B8\uB860",
-          description: rawDesc
-        });
       }
     }
   } catch (err) {
-    console.error("Failed to search web news:", err);
+    console.warn("Daum news search error:", err);
+  }
+  if (articles.length < 3) {
+    try {
+      const urls = [
+        `https://news.google.com/rss/search?q=${encodeURIComponent(cleanKeyword)}&hl=ko&gl=KR&ceid=KR:ko`,
+        `https://news.google.com/rss/search?q=${encodeURIComponent(cleanKeyword + " \uB274\uC2A4")}&hl=ko&gl=KR&ceid=KR:ko`
+      ];
+      let xml = "";
+      for (const feedUrl of urls) {
+        try {
+          const resp = await fetch(feedUrl, {
+            signal: AbortSignal.timeout(5e3),
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            }
+          });
+          if (resp.ok) {
+            xml = await resp.text();
+            if (xml && xml.includes("<item>")) break;
+          }
+        } catch (fetchErr) {
+          console.warn("Feed fetch warning:", fetchErr);
+        }
+      }
+      if (xml) {
+        const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+        for (const match of itemMatches.slice(0, 10)) {
+          const itemXml = match[1];
+          const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
+          const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
+          const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+          const sourceMatch = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/);
+          const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
+          if (titleMatch && linkMatch) {
+            let cleanTitle = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+            let sourceName = sourceMatch ? sourceMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").trim() : "";
+            if (!sourceName && cleanTitle.includes(" - ")) {
+              const parts = cleanTitle.split(" - ");
+              sourceName = parts.pop() || "";
+              cleanTitle = parts.join(" - ");
+            }
+            const rawLink = linkMatch[1].trim();
+            const rawPubDate = pubDateMatch ? pubDateMatch[1].trim() : "";
+            const rawDesc = descMatch ? descMatch[1].replace(/<[^>]+>/g, " ").replace(/<!\[CDATA\[(.*?)\]\]>/g, "$1").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim() : "";
+            articles.push({
+              title: cleanTitle,
+              link: rawLink,
+              pubDate: rawPubDate,
+              source: sourceName || "\uC8FC\uC694 \uC5B8\uB860",
+              description: rawDesc
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to search web news:", err);
+    }
   }
   return articles;
 }
@@ -107,9 +150,9 @@ function createDirectResponseFromWeb(keyword, todayStr, webArticles) {
           "\uAE30\uC220 \uB3C4\uC785 \uAE30\uC5C5\uB4E4\uC758 \uC2E4\uBB34 \uC131\uACF5 \uC0AC\uB840 \uD655\uC0B0",
           "\uC911\uC7A5\uAE30\uC801 \uC2DC\uC7A5 \uD30C\uAE09\uB825 \uBC0F \uD45C\uC900\uD654 \uC6C0\uC9C1\uC784"
         ],
-        url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}`,
-        source: "\uAE00\uB85C\uBC8C \uD14C\uD06C \uB9AC\uD3EC\uD2B8",
-        publishedDate: todayStr,
+        url: webArticles[0]?.link || "https://news.daum.net",
+        source: webArticles[0]?.source || "\uAE00\uB85C\uBC8C \uD14C\uD06C \uB9AC\uD3EC\uD2B8",
+        publishedDate: webArticles[0]?.pubDate || todayStr,
         categoryTag: "\uC0B0\uC5C5 \uD2B8\uB80C\uB4DC"
       },
       {
@@ -123,9 +166,9 @@ function createDirectResponseFromWeb(keyword, todayStr, webArticles) {
           "\uB370\uC774\uD130 \uC815\uD569\uC131 \uBC0F \uC131\uB2A5 \uBAA8\uB2C8\uD130\uB9C1 \uBAA8\uBC94 \uC0AC\uB840",
           "\uC9C0\uC18D \uAC00\uB2A5\uD55C \uC6B4\uC601 \uBC0F \uD611\uC5C5 \uB8E8\uD504"
         ],
-        url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}`,
-        source: "\uD14C\uD06C \uB9AC\uC11C\uCE58 \uD3EC\uB7FC",
-        publishedDate: todayStr,
+        url: webArticles[1]?.link || "https://news.daum.net",
+        source: webArticles[1]?.source || "\uD14C\uD06C \uB9AC\uC11C\uCE58 \uD3EC\uB7FC",
+        publishedDate: webArticles[1]?.pubDate || todayStr,
         categoryTag: "\uC2E4\uBB34 & \uC544\uD0A4\uD14D\uCC98"
       },
       {
@@ -139,15 +182,13 @@ function createDirectResponseFromWeb(keyword, todayStr, webArticles) {
           "\uC778\uC7AC \uC721\uC131 \uBC0F \uB0B4\uBD80 \uC5ED\uB7C9 \uAC15\uD654\uB97C \uC704\uD55C \uAC00\uC774\uB4DC",
           "\uC724\uB9AC\uC801 \uAE30\uC900\uACFC \uAC70\uBC84\uB10C\uC2A4 \uC218\uB9BD"
         ],
-        url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}`,
-        source: "IT \uC774\uB178\uBCA0\uC774\uC158 \uB9AC\uBDF0",
-        publishedDate: todayStr,
+        url: webArticles[2]?.link || "https://news.daum.net",
+        source: webArticles[2]?.source || "IT \uC774\uB178\uBCA0\uC774\uC158 \uB9AC\uBDF0",
+        publishedDate: webArticles[2]?.pubDate || todayStr,
         categoryTag: "\uBBF8\uB798 \uC804\uB9DD"
       }
     ],
-    groundingSources: [
-      { title: `${keyword} \uAD00\uB828 \uCD5C\uC2E0 \uC6F9 \uAC80\uC0C9 \uACB0\uACFC`, url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}` }
-    ]
+    groundingSources: webArticles.length > 0 ? webArticles.slice(0, 5).map((w) => ({ title: w.title, url: w.link })) : [{ title: `${keyword} \uAD00\uB828 \uCD5C\uC2E0 \uB274\uC2A4`, url: "https://news.daum.net" }]
   };
 }
 function createExpressApp() {
@@ -188,6 +229,7 @@ function createExpressApp() {
 \uBC1C\uD589\uC77C: ${art.pubDate}
 \uB9C1\uD06C: ${art.link}
 \uB0B4\uC6A9 \uBBF8\uB9AC\uBCF4\uAE30: ${art.description || "\uB0B4\uC6A9 \uC5C6\uC74C"}`).join("\n\n") : "\uC6F9 \uD53C\uB4DC \uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCD5C\uC2E0 \uC2E4\uC2DC\uAC04 \uC815\uBCF4\uB97C \uAE30\uBC18\uC73C\uB85C \uBD84\uC11D\uD574\uC8FC\uC138\uC694.";
+      const maxWebCount = Math.min(webArticles.length, 10);
       const prompt = `\uB2F9\uC2E0\uC740 \uB300\uD55C\uBBFC\uAD6D \uCD5C\uACE0\uC758 \uD14C\uD06C \uC800\uB110\uB9AC\uC998 \uBC0F \uAE30\uC0AC \uD050\uB808\uC774\uC158 \uC804\uBB38 AI \uC5D0\uB514\uD130\uC785\uB2C8\uB2E4.
 \uC0AC\uC6A9\uC790\uAC00 \uAC80\uC0C9\uD55C \uD575\uC2EC \uC8FC\uC81C/\uD0A4\uC6CC\uB4DC\uB294 \uB2E4\uC74C\uACFC \uAC19\uC2B5\uB2C8\uB2E4: "${cleanKeyword}"
 
@@ -197,15 +239,16 @@ function createExpressApp() {
 ${articlesContext}
 
 [\uB2F9\uC2E0\uC758 \uC784\uBB34]
-1. \uC6F9\uC5D0\uC11C \uAC80\uC0C9\uB41C \uC704 \uAE30\uC0AC\uB4E4\uC758 \uB0B4\uC6A9\uC744 \uC2EC\uCE35 \uBD84\uC11D\uD558\uC5EC, "${cleanKeyword}"\uC640\uC758 \uD575\uC2EC \uC5F0\uAD00\uC131, \uC0B0\uC5C5/\uAE30\uC220\uC801 \uD30C\uAE09\uB825, \uB3C5\uC790\uC5D0\uAC8C \uC8FC\uB294 \uC720\uC6A9\uC131\uC744 \uAE30\uC900\uC73C\uB85C \uAC01 \uAE30\uC0AC\uC758 "\uB0B4\uC6A9 \uC911\uC694\uB3C4"\uB97C \uBA74\uBC00\uD788 \uD3C9\uAC00\uD558\uC138\uC694.
+1. \uC6F9\uC5D0\uC11C \uAC80\uC0C9\uB41C \uC704 [\uAE30\uC0AC 1] ~ [\uAE30\uC0AC ${maxWebCount}] \uBAA9\uB85D\uC758 \uB0B4\uC6A9\uC744 \uC2EC\uCE35 \uBD84\uC11D\uD558\uC5EC, "${cleanKeyword}"\uC640\uC758 \uD575\uC2EC \uC5F0\uAD00\uC131, \uC0B0\uC5C5/\uAE30\uC220\uC801 \uD30C\uAE09\uB825, \uB3C5\uC790\uC5D0\uAC8C \uC8FC\uB294 \uC720\uC6A9\uC131\uC744 \uAE30\uC900\uC73C\uB85C \uAC01 \uAE30\uC0AC\uC758 "\uB0B4\uC6A9 \uC911\uC694\uB3C4"\uB97C \uBA74\uBC00\uD788 \uD3C9\uAC00\uD558\uC138\uC694.
 2. \uAC00\uC7A5 \uC911\uC694\uD558\uACE0 \uC720\uC775\uD55C \uCD5C\uC0C1\uC704 \uD575\uC2EC \uAE30\uC0AC 3\uAC74\uC744 \uC5C4\uC120\uD558\uC138\uC694.
 3. \uC120\uBCC4\uB41C 3\uAC74 \uAC01\uAC01\uC5D0 \uB300\uD574:
+   - \u{1F4CC} \uAE30\uC0AC \uC778\uB371\uC2A4 (articleIndex: \uC704 [\uAE30\uC0AC N] \uBAA9\uB85D\uC758 \uBC88\uD638 1~${maxWebCount})
    - \u{1F4CC} \uAE30\uC0AC \uC81C\uBAA9 (\uC2E4\uC81C \uAE30\uC0AC\uC758 \uD575\uC2EC \uC81C\uBAA9\uC744 \uC65C\uACE1 \uC5C6\uC774 \uAE54\uB054\uD558\uAC8C \uC81C\uC2DC)
    - \u{1F4DD} \uD575\uC2EC \uC694\uC57D (\uD574\uB2F9 \uAE30\uC0AC\uC758 \uD575\uC2EC \uB0B4\uC6A9\uC744 \uBA85\uD655\uD558\uACE0 \uAC04\uACB0\uD558\uAC8C 3~4\uBB38\uC7A5\uC758 \uC644\uC131\uB3C4 \uB192\uC740 \uD55C\uAE00 \uBB38\uC7A5\uC73C\uB85C \uC815\uB9AC)
    - \u{1F4A1} \uC911\uC694\uB3C4 \uC810\uC218 (importanceScore: 1~100\uC810 \uC815\uC218, 1\uC704\uB294 95~100\uC810\uB300)
    - \u{1F4A1} \uC911\uC694\uB3C4 \uC120\uC815 \uC774\uC720 (importanceReason: \uC65C \uC774 \uAE30\uC0AC\uAC00 \uC911\uC694\uD558\uAC8C \uD3C9\uAC00\uB418\uC5C8\uB294\uC9C0 1\uBB38\uC7A5)
    - \uC8FC\uC694 \uD575\uC2EC \uD3EC\uC778\uD2B8 3\uAC1C (keyPoints: ["\uD3EC\uC778\uD2B8 1", "\uD3EC\uC778\uD2B8 2", "\uD3EC\uC778\uD2B8 3"])
-   - \u{1F517} \uC6D0\uBB38 \uB9C1\uD06C (url: \uC218\uC9D1\uB41C \uC2E4\uC81C \uAE30\uC0AC\uC758 link URL\uC744 \uBC18\uB4DC\uC2DC \uADF8\uB300\uB85C \uC0AC\uC6A9)
+   - \u{1F517} \uC6D0\uBB38 \uAE30\uC0AC \uB9C1\uD06C (url: \uBC18\uB4DC\uC2DC \uC120\uBCC4\uD55C [\uAE30\uC0AC N]\uC758 \uC2E4\uC81C \uC6D0\uBB38 \uB9C1\uD06C\uB97C \uADF8\uB300\uB85C \uC0AC\uC6A9\uD558\uC138\uC694. \uD3EC\uD138 \uAC80\uC0C9 \uD398\uC774\uC9C0\uB098 \uAC00\uC9DC URL\uC744 \uC0DD\uC131\uD558\uC9C0 \uB9C8\uC138\uC694)
    - \uC5B8\uB860\uC0AC(source) \uBC0F \uBC1C\uD589 \uC2DC\uAE30(publishedDate)
 4. 3\uAC74\uC758 \uAE30\uC0AC\uB97C \uC544\uC6B0\uB974\uB294 \uC885\uD569 \uD2B8\uB80C\uB4DC \uBC0F \uC911\uC694\uB3C4 \uBD84\uC11D(overallSummary)\uC744 2~3\uBB38\uC7A5\uC73C\uB85C \uC791\uC131\uD558\uC138\uC694.
 
@@ -219,6 +262,7 @@ ${articlesContext}
   "articles": [
     {
       "id": 1,
+      "articleIndex": 1,
       "title": "\u{1F4CC} \uAE30\uC0AC \uC81C\uBAA9",
       "summary": "\uD575\uC2EC \uB0B4\uC6A9 3~4\uBB38\uC7A5 \uD55C\uAE00 \uC694\uC57D",
       "importanceScore": 98,
@@ -228,7 +272,7 @@ ${articlesContext}
         "\uD575\uC2EC \uD3EC\uC778\uD2B8 2",
         "\uD575\uC2EC \uD3EC\uC778\uD2B8 3"
       ],
-      "url": "https://\uC2E4\uC81C\uAE30\uC0ACURL",
+      "url": "\uC6D0\uBB38 \uAE30\uC0AC \uC9C1\uC811 \uB9C1\uD06C",
       "source": "\uC5B8\uB860\uC0AC\uBA85",
       "publishedDate": "\uBC1C\uD589\uC77C",
       "categoryTag": "\uBD84\uC57C (\uC608: AI/\uC18C\uD504\uD2B8\uC6E8\uC5B4, \uC0B0\uC5C5 \uB3D9\uD5A5, \uC815\uCC45 \uB4F1)"
@@ -256,20 +300,43 @@ ${articlesContext}
       }
       if (parsedData && Array.isArray(parsedData.articles) && parsedData.articles.length > 0) {
         parsedData.articles = parsedData.articles.slice(0, 3).map((art, idx) => {
-          let artUrl = art.url;
-          if ((!artUrl || !artUrl.startsWith("http") || artUrl.includes("example.com")) && webArticles[idx]) {
-            artUrl = webArticles[idx].link;
+          let matched;
+          const articleIdx = art.articleIndex || art.selectedArticleIndex;
+          if (typeof articleIdx === "number" && webArticles[articleIdx - 1]) {
+            matched = webArticles[articleIdx - 1];
+          }
+          if (!matched && art.title && webArticles.length > 0) {
+            const cleanArtTitle = art.title.replace(/^📌\s*/, "").replace(/\[.*?\]/g, "").trim().toLowerCase();
+            matched = webArticles.find((w) => {
+              const cleanWTitle = w.title.toLowerCase();
+              return cleanWTitle.includes(cleanArtTitle.slice(0, 8)) || cleanArtTitle.includes(cleanWTitle.slice(0, 8));
+            });
+          }
+          if (!matched && webArticles[idx]) {
+            matched = webArticles[idx];
+          }
+          const rawTitle = art.title || matched?.title || `${cleanKeyword} \uAD00\uB828 \uC8FC\uC694 \uBCF4\uB3C4`;
+          const sourceName = art.source || matched?.source || "\uC8FC\uC694 \uC5B8\uB860";
+          let directArticleUrl = matched?.link;
+          if (!directArticleUrl || !directArticleUrl.startsWith("http") || directArticleUrl.includes("search.naver.com") || directArticleUrl.includes("/search?")) {
+            if (art.url && art.url.startsWith("http") && !art.url.includes("example.com") && !art.url.includes("\uC2E4\uC81C\uAE30\uC0ACURL") && !art.url.includes("search.naver.com") && !art.url.includes("/search?")) {
+              directArticleUrl = art.url;
+            } else if (webArticles[idx]?.link && !webArticles[idx].link.includes("search.naver.com")) {
+              directArticleUrl = webArticles[idx].link;
+            } else {
+              directArticleUrl = "https://news.daum.net";
+            }
           }
           return {
             id: art.id || idx + 1,
-            title: art.title || `\u{1F4CC} ${webArticles[idx]?.title || "\uC8FC\uC694 \uBCF4\uB3C4"}`,
+            title: rawTitle.startsWith("\u{1F4CC}") ? rawTitle : `\u{1F4CC} ${rawTitle}`,
             summary: art.summary || "\uB0B4\uC6A9 \uC694\uC57D\uC774 \uC0DD\uC131\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4.",
             importanceScore: typeof art.importanceScore === "number" ? art.importanceScore : 98 - idx * 3,
             importanceReason: art.importanceReason || "\uD575\uC2EC \uC8FC\uC81C \uC5F0\uAD00\uC131 \uBC0F \uC815\uBCF4 \uAC00\uCE58 \uC6B0\uC218",
             keyPoints: Array.isArray(art.keyPoints) && art.keyPoints.length > 0 ? art.keyPoints : ["\uD575\uC2EC \uC8FC\uC694 \uB3D9\uD5A5", "\uC2E4\uBB34 \uC801\uC6A9 \uC2DC\uC0AC\uC810", "\uD5A5\uD6C4 \uBC1C\uC804 \uBC29\uD5A5"],
-            url: artUrl,
-            source: art.source || webArticles[idx]?.source || "\uC8FC\uC694 \uC5B8\uB860",
-            publishedDate: art.publishedDate || webArticles[idx]?.pubDate || todayStr,
+            url: directArticleUrl,
+            source: sourceName,
+            publishedDate: art.publishedDate || matched?.pubDate || todayStr,
             categoryTag: art.categoryTag || "\uC8FC\uC694 \uB274\uC2A4"
           };
         });

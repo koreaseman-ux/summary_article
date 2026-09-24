@@ -37,83 +37,148 @@ interface WebArticleItem {
 
 export async function searchWebNews(keyword: string): Promise<WebArticleItem[]> {
   const articles: WebArticleItem[] = [];
+  const cleanKeyword = keyword.trim();
+
+  // 1. Daum News Search (포털 검색창이 아닌 실제 기사 본문 https://v.daum.net/v/... 직접 링크 수집)
   try {
-    const urls = [
-      `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`,
-      `https://news.google.com/rss/search?q=${encodeURIComponent(keyword + ' 뉴스')}&hl=ko&gl=KR&ceid=KR:ko`,
-    ];
+    const daumUrl = `https://search.daum.net/search?w=news&q=${encodeURIComponent(cleanKeyword)}&DA=STC`;
+    const resp = await fetch(daumUrl, {
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
 
-    let xml = '';
-    for (const feedUrl of urls) {
-      try {
-        const resp = await fetch(feedUrl, {
-          signal: AbortSignal.timeout(5000),
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          },
-        });
-        if (resp.ok) {
-          xml = await resp.text();
-          if (xml && xml.includes('<item>')) break;
-        }
-      } catch (fetchErr) {
-        console.warn('Feed fetch warning:', fetchErr);
-      }
-    }
+    if (resp.ok) {
+      const html = await resp.text();
+      const liMatches = [...html.matchAll(/<li[^>]*data-docid="([^"]+)"[\s\S]*?<\/li>/g)];
+      for (const match of liMatches.slice(0, 10)) {
+        const block = match[0];
+        const titleMatch = block.match(/<div class="item-title">[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+        if (!titleMatch) continue;
 
-    if (!xml) return articles;
-
-    const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
-    for (const match of itemMatches.slice(0, 15)) {
-      const itemXml = match[1];
-      const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
-      const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
-      const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
-      const sourceMatch = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/);
-      const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
-
-      if (titleMatch && linkMatch) {
-        let cleanTitle = titleMatch[1]
-          .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+        let link = titleMatch[1];
+        if (link.startsWith('http://')) link = link.replace('http://', 'https://');
+        const title = titleMatch[2]
+          .replace(/<[^>]+>/g, '')
           .replace(/&quot;/g, '"')
           .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
+          .replace(/&#39;/g, "'")
           .trim();
 
-        let sourceName = sourceMatch ? sourceMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
-        if (!sourceName && cleanTitle.includes(' - ')) {
-          const parts = cleanTitle.split(' - ');
-          sourceName = parts.pop() || '';
-          cleanTitle = parts.join(' - ');
-        }
+        const writerMatch = block.match(/class="item-writer"[^>]*>([\s\S]*?)<\/a>/i);
+        const source = writerMatch ? writerMatch[1].replace(/<[^>]+>/g, '').trim() : '';
 
-        const rawLink = linkMatch[1].trim();
-        const rawPubDate = pubDateMatch ? pubDateMatch[1].trim() : '';
-        const rawDesc = descMatch
+        const descMatch = block.match(/class="conts-desc[^"]*"[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
+        const desc = descMatch
           ? descMatch[1]
-              .replace(/<[^>]+>/g, ' ')
+              .replace(/<[^>]+>/g, '')
+              .replace(/&quot;/g, '"')
+              .replace(/&amp;/g, '&')
+              .replace(/&#39;/g, "'")
+              .trim()
+          : '';
+
+        const timeMatch = block.match(/class="gem-subinfo"[\s\S]*?class="txt_info"[^>]*>([\s\S]*?)<\/span>/i);
+        const pubDate = timeMatch ? timeMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+
+        if (title && link.startsWith('http')) {
+          articles.push({
+            title,
+            link,
+            source: source || '주요 언론',
+            pubDate,
+            description: desc,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Daum news search error:', err);
+  }
+
+  // 2. Google News RSS 폴백 (Daum 기사가 3건 미만일 때 보충)
+  if (articles.length < 3) {
+    try {
+      const urls = [
+        `https://news.google.com/rss/search?q=${encodeURIComponent(cleanKeyword)}&hl=ko&gl=KR&ceid=KR:ko`,
+        `https://news.google.com/rss/search?q=${encodeURIComponent(cleanKeyword + ' 뉴스')}&hl=ko&gl=KR&ceid=KR:ko`,
+      ];
+
+      let xml = '';
+      for (const feedUrl of urls) {
+        try {
+          const resp = await fetch(feedUrl, {
+            signal: AbortSignal.timeout(5000),
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            },
+          });
+          if (resp.ok) {
+            xml = await resp.text();
+            if (xml && xml.includes('<item>')) break;
+          }
+        } catch (fetchErr) {
+          console.warn('Feed fetch warning:', fetchErr);
+        }
+      }
+
+      if (xml) {
+        const itemMatches = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)];
+        for (const match of itemMatches.slice(0, 10)) {
+          const itemXml = match[1];
+          const titleMatch = itemXml.match(/<title>([\s\S]*?)<\/title>/);
+          const linkMatch = itemXml.match(/<link>([\s\S]*?)<\/link>/);
+          const pubDateMatch = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+          const sourceMatch = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/);
+          const descMatch = itemXml.match(/<description>([\s\S]*?)<\/description>/);
+
+          if (titleMatch && linkMatch) {
+            let cleanTitle = titleMatch[1]
               .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
               .replace(/&quot;/g, '"')
               .replace(/&amp;/g, '&')
               .replace(/&lt;/g, '<')
               .replace(/&gt;/g, '>')
-              .replace(/\s+/g, ' ')
-              .trim()
-          : '';
+              .trim();
 
-        articles.push({
-          title: cleanTitle,
-          link: rawLink,
-          pubDate: rawPubDate,
-          source: sourceName || '주요 언론',
-          description: rawDesc,
-        });
+            let sourceName = sourceMatch ? sourceMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+            if (!sourceName && cleanTitle.includes(' - ')) {
+              const parts = cleanTitle.split(' - ');
+              sourceName = parts.pop() || '';
+              cleanTitle = parts.join(' - ');
+            }
+
+            const rawLink = linkMatch[1].trim();
+            const rawPubDate = pubDateMatch ? pubDateMatch[1].trim() : '';
+            const rawDesc = descMatch
+              ? descMatch[1]
+                  .replace(/<[^>]+>/g, ' ')
+                  .replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&amp;/g, '&')
+                  .replace(/&lt;/g, '<')
+                  .replace(/&gt;/g, '>')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+              : '';
+
+            articles.push({
+              title: cleanTitle,
+              link: rawLink,
+              pubDate: rawPubDate,
+              source: sourceName || '주요 언론',
+              description: rawDesc,
+            });
+          }
+        }
       }
+    } catch (err) {
+      console.error('Failed to search web news:', err);
     }
-  } catch (err) {
-    console.error('Failed to search web news:', err);
   }
 
   return articles;
@@ -170,9 +235,9 @@ export function createDirectResponseFromWeb(
           '기술 도입 기업들의 실무 성공 사례 확산',
           '중장기적 시장 파급력 및 표준화 움직임'
         ],
-        url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}`,
-        source: '글로벌 테크 리포트',
-        publishedDate: todayStr,
+        url: webArticles[0]?.link || 'https://news.daum.net',
+        source: webArticles[0]?.source || '글로벌 테크 리포트',
+        publishedDate: webArticles[0]?.pubDate || todayStr,
         categoryTag: '산업 트렌드'
       },
       {
@@ -186,9 +251,9 @@ export function createDirectResponseFromWeb(
           '데이터 정합성 및 성능 모니터링 모범 사례',
           '지속 가능한 운영 및 협업 루프'
         ],
-        url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}`,
-        source: '테크 리서치 포럼',
-        publishedDate: todayStr,
+        url: webArticles[1]?.link || 'https://news.daum.net',
+        source: webArticles[1]?.source || '테크 리서치 포럼',
+        publishedDate: webArticles[1]?.pubDate || todayStr,
         categoryTag: '실무 & 아키텍처'
       },
       {
@@ -202,15 +267,15 @@ export function createDirectResponseFromWeb(
           '인재 육성 및 내부 역량 강화를 위한 가이드',
           '윤리적 기준과 거버넌스 수립'
         ],
-        url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}`,
-        source: 'IT 이노베이션 리뷰',
-        publishedDate: todayStr,
+        url: webArticles[2]?.link || 'https://news.daum.net',
+        source: webArticles[2]?.source || 'IT 이노베이션 리뷰',
+        publishedDate: webArticles[2]?.pubDate || todayStr,
         categoryTag: '미래 전망'
       }
     ],
-    groundingSources: [
-      { title: `${keyword} 관련 최신 웹 검색 결과`, url: `https://news.google.com/search?q=${encodeURIComponent(keyword)}` }
-    ]
+    groundingSources: webArticles.length > 0
+      ? webArticles.slice(0, 5).map(w => ({ title: w.title, url: w.link }))
+      : [{ title: `${keyword} 관련 최신 뉴스`, url: 'https://news.daum.net' }]
   };
 }
 
@@ -267,6 +332,7 @@ export function createExpressApp() {
 내용 미리보기: ${art.description || '내용 없음'}`).join('\n\n')
         : '웹 피드 검색 결과가 없습니다. 최신 실시간 정보를 기반으로 분석해주세요.';
 
+      const maxWebCount = Math.min(webArticles.length, 10);
       const prompt = `당신은 대한민국 최고의 테크 저널리즘 및 기사 큐레이션 전문 AI 에디터입니다.
 사용자가 검색한 핵심 주제/키워드는 다음과 같습니다: "${cleanKeyword}"
 
@@ -276,15 +342,16 @@ export function createExpressApp() {
 ${articlesContext}
 
 [당신의 임무]
-1. 웹에서 검색된 위 기사들의 내용을 심층 분석하여, "${cleanKeyword}"와의 핵심 연관성, 산업/기술적 파급력, 독자에게 주는 유용성을 기준으로 각 기사의 "내용 중요도"를 면밀히 평가하세요.
+1. 웹에서 검색된 위 [기사 1] ~ [기사 ${maxWebCount}] 목록의 내용을 심층 분석하여, "${cleanKeyword}"와의 핵심 연관성, 산업/기술적 파급력, 독자에게 주는 유용성을 기준으로 각 기사의 "내용 중요도"를 면밀히 평가하세요.
 2. 가장 중요하고 유익한 최상위 핵심 기사 3건을 엄선하세요.
 3. 선별된 3건 각각에 대해:
+   - 📌 기사 인덱스 (articleIndex: 위 [기사 N] 목록의 번호 1~${maxWebCount})
    - 📌 기사 제목 (실제 기사의 핵심 제목을 왜곡 없이 깔끔하게 제시)
    - 📝 핵심 요약 (해당 기사의 핵심 내용을 명확하고 간결하게 3~4문장의 완성도 높은 한글 문장으로 정리)
    - 💡 중요도 점수 (importanceScore: 1~100점 정수, 1위는 95~100점대)
    - 💡 중요도 선정 이유 (importanceReason: 왜 이 기사가 중요하게 평가되었는지 1문장)
    - 주요 핵심 포인트 3개 (keyPoints: ["포인트 1", "포인트 2", "포인트 3"])
-   - 🔗 원문 링크 (url: 수집된 실제 기사의 link URL을 반드시 그대로 사용)
+   - 🔗 원문 기사 링크 (url: 반드시 선별한 [기사 N]의 실제 원문 링크를 그대로 사용하세요. 포털 검색 페이지나 가짜 URL을 생성하지 마세요)
    - 언론사(source) 및 발행 시기(publishedDate)
 4. 3건의 기사를 아우르는 종합 트렌드 및 중요도 분석(overallSummary)을 2~3문장으로 작성하세요.
 
@@ -298,6 +365,7 @@ ${articlesContext}
   "articles": [
     {
       "id": 1,
+      "articleIndex": 1,
       "title": "📌 기사 제목",
       "summary": "핵심 내용 3~4문장 한글 요약",
       "importanceScore": 98,
@@ -307,7 +375,7 @@ ${articlesContext}
         "핵심 포인트 2",
         "핵심 포인트 3"
       ],
-      "url": "https://실제기사URL",
+      "url": "원문 기사 직접 링크",
       "source": "언론사명",
       "publishedDate": "발행일",
       "categoryTag": "분야 (예: AI/소프트웨어, 산업 동향, 정책 등)"
@@ -340,22 +408,71 @@ ${articlesContext}
 
       if (parsedData && Array.isArray(parsedData.articles) && parsedData.articles.length > 0) {
         parsedData.articles = parsedData.articles.slice(0, 3).map((art, idx) => {
-          let artUrl = art.url;
-          if ((!artUrl || !artUrl.startsWith('http') || artUrl.includes('example.com')) && webArticles[idx]) {
-            artUrl = webArticles[idx].link;
+          // 1. LLM이 지정한 articleIndex 또는 유사도 매칭으로 실제 크롤링 기사 탐색
+          let matched: WebArticleItem | undefined;
+          const articleIdx = (art as any).articleIndex || (art as any).selectedArticleIndex;
+          if (typeof articleIdx === 'number' && webArticles[articleIdx - 1]) {
+            matched = webArticles[articleIdx - 1];
           }
+
+          // 2. 제목 유사도로 매칭
+          if (!matched && art.title && webArticles.length > 0) {
+            const cleanArtTitle = art.title.replace(/^📌\s*/, '').replace(/\[.*?\]/g, '').trim().toLowerCase();
+            matched = webArticles.find((w) => {
+              const cleanWTitle = w.title.toLowerCase();
+              return (
+                cleanWTitle.includes(cleanArtTitle.slice(0, 8)) ||
+                cleanArtTitle.includes(cleanWTitle.slice(0, 8))
+              );
+            });
+          }
+
+          // 3. 인덱스 순서 폴백
+          if (!matched && webArticles[idx]) {
+            matched = webArticles[idx];
+          }
+
+          const rawTitle = art.title || matched?.title || `${cleanKeyword} 관련 주요 보도`;
+          const sourceName = art.source || matched?.source || '주요 언론';
+
+          // 4. 원문 기사 본문으로 바로 연결되는 신뢰할 수 있는 직접 링크 확정
+          // (포털 검색 페이지나 가짜 URL이 아닌, 실제 수집된 기사의 원문 링크를 최우선 적용)
+          let directArticleUrl = matched?.link;
+          if (
+            !directArticleUrl ||
+            !directArticleUrl.startsWith('http') ||
+            directArticleUrl.includes('search.naver.com') ||
+            directArticleUrl.includes('/search?')
+          ) {
+            if (
+              art.url &&
+              art.url.startsWith('http') &&
+              !art.url.includes('example.com') &&
+              !art.url.includes('실제기사URL') &&
+              !art.url.includes('search.naver.com') &&
+              !art.url.includes('/search?')
+            ) {
+              directArticleUrl = art.url;
+            } else if (webArticles[idx]?.link && !webArticles[idx].link.includes('search.naver.com')) {
+              directArticleUrl = webArticles[idx].link;
+            } else {
+              directArticleUrl = 'https://news.daum.net';
+            }
+          }
+
           return {
             id: art.id || idx + 1,
-            title: art.title || `📌 ${webArticles[idx]?.title || '주요 보도'}`,
+            title: rawTitle.startsWith('📌') ? rawTitle : `📌 ${rawTitle}`,
             summary: art.summary || '내용 요약이 생성되지 않았습니다.',
-            importanceScore: typeof art.importanceScore === 'number' ? art.importanceScore : (98 - idx * 3),
+            importanceScore: typeof art.importanceScore === 'number' ? art.importanceScore : 98 - idx * 3,
             importanceReason: art.importanceReason || '핵심 주제 연관성 및 정보 가치 우수',
-            keyPoints: Array.isArray(art.keyPoints) && art.keyPoints.length > 0 
-              ? art.keyPoints 
-              : ['핵심 주요 동향', '실무 적용 시사점', '향후 발전 방향'],
-            url: artUrl,
-            source: art.source || webArticles[idx]?.source || '주요 언론',
-            publishedDate: art.publishedDate || webArticles[idx]?.pubDate || todayStr,
+            keyPoints:
+              Array.isArray(art.keyPoints) && art.keyPoints.length > 0
+                ? art.keyPoints
+                : ['핵심 주요 동향', '실무 적용 시사점', '향후 발전 방향'],
+            url: directArticleUrl,
+            source: sourceName,
+            publishedDate: art.publishedDate || matched?.pubDate || todayStr,
             categoryTag: art.categoryTag || '주요 뉴스',
           };
         });
