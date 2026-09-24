@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Sparkles, 
-  Layers, 
-  FileText, 
-  Copy, 
-  Check, 
-  Share2, 
   AlertCircle, 
-  ExternalLink,
   RefreshCw,
   Search,
   CheckCircle2,
@@ -17,13 +11,11 @@ import {
 import { Header } from './components/Header.tsx';
 import { SearchSection } from './components/SearchSection.tsx';
 import { ArticleCard } from './components/ArticleCard.tsx';
-import { MarkdownView } from './components/MarkdownView.tsx';
 import { ApiGuideModal } from './components/ApiGuideModal.tsx';
 import { BookmarksDrawer } from './components/BookmarksDrawer.tsx';
 import { MobileConnectModal } from './components/MobileConnectModal.tsx';
 import { Toast } from './components/Toast.tsx';
 import { CurationData, Article, BookmarkArticle } from './types.ts';
-import { generateFullMarkdown } from './utils/markdown.ts';
 
 const INITIAL_DATA: CurationData = {
   keyword: '소프트웨어 공학 AI 트렌드',
@@ -93,7 +85,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingStep, setLoadingStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'card' | 'markdown'>('card');
   
   // Storage states
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -119,7 +110,6 @@ export default function App() {
   const [isBookmarksOpen, setIsBookmarksOpen] = useState<boolean>(false);
   const [isMobileConnectOpen, setIsMobileConnectOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
 
   // Sync to local storage
   useEffect(() => {
@@ -217,34 +207,6 @@ export default function App() {
   const handleRemoveBookmark = (id: number, keyword: string) => {
     setBookmarks((prev) => prev.filter((b) => !(b.id === id && b.keyword === keyword)));
     showToast('보관함에서 삭제되었습니다.');
-  };
-
-  const handleCopyFullMarkdown = async () => {
-    const md = generateFullMarkdown(curationData);
-    try {
-      await navigator.clipboard.writeText(md);
-      setCopiedSummary(true);
-      showToast('전체 요약 마크다운이 클립보드에 복사되었습니다.');
-      setTimeout(() => setCopiedSummary(false), 2000);
-    } catch {
-      showToast('복사에 실패했습니다.');
-    }
-  };
-
-  const handleShareAll = async () => {
-    const md = generateFullMarkdown(curationData);
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `[AI 뉴스 브리프] ${curationData.keyword} 중요도 Top 3`,
-          text: md,
-        });
-      } catch {
-        // User cancelled share
-      }
-    } else {
-      handleCopyFullMarkdown();
-    }
   };
 
   return (
@@ -359,150 +321,21 @@ export default function App() {
         {/* Results Section */}
         {!isLoading && curationData && (
           <div className="space-y-4">
-            {/* Overview & Controls Bar */}
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
-                      키워드: {curationData.keyword}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      기준 일자: {curationData.searchDate}
-                    </span>
-                    {curationData.totalFoundCount && curationData.totalFoundCount > 0 && (
-                      <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 font-medium">
-                        웹 기사 {curationData.totalFoundCount}건 분석 완료
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                      중요도 평가 상위 핵심 기사 3선
-                    </h3>
-                    <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-                      • {curationData.modelUsed || 'Gemini Flash-Lite 엔진'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* View Switcher & Action buttons */}
-                <div className="flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
-                  {/* Card / Markdown View Toggle */}
-                  <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200/60">
-                    <button
-                      onClick={() => setViewMode('card')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
-                        viewMode === 'card'
-                          ? 'bg-white text-slate-900 font-bold shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      title="모바일 카드 뷰"
-                    >
-                      <Layers className="w-3.5 h-3.5" />
-                      <span>카드 뷰</span>
-                    </button>
-                    <button
-                      onClick={() => setViewMode('markdown')}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
-                        viewMode === 'markdown'
-                          ? 'bg-white text-slate-900 font-bold shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                      title="구조화 마크다운 뷰"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>마크다운 뷰</span>
-                    </button>
-                  </div>
-
-                  {/* One-click Markdown Copy */}
-                  <button
-                    onClick={handleCopyFullMarkdown}
-                    className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors shadow-xs"
-                    title="전체 요약 마크다운 복사"
-                  >
-                    {copiedSummary ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-300">복사 완료</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-slate-300" />
-                        <span>전체 MD 복사</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Share */}
-                  <button
-                    onClick={handleShareAll}
-                    className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl border border-slate-200/80 transition-colors"
-                    title="공유하기"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* 💡 Overall Trend Insight Box */}
-              {curationData.overallSummary && (
-                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-100 flex items-start gap-2.5">
-                  <span className="text-base sm:text-lg select-none">💡</span>
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block mb-0.5">
-                      종합 트렌드 &amp; 내용 중요도 분석
-                    </span>
-                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
-                      {curationData.overallSummary}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Verified Grounding Sources Pills */}
-              {curationData.groundingSources && curationData.groundingSources.length > 0 && (
-                <div className="pt-1 flex items-center gap-1.5 flex-wrap text-xs text-slate-500">
-                  <span className="text-[11px] font-semibold text-slate-400">실시간 웹 소스:</span>
-                  {curationData.groundingSources.map((src, i) => (
-                    <a
-                      key={i}
-                      href={src.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-slate-600 hover:text-indigo-600 bg-slate-100/90 hover:bg-indigo-50 px-2 py-0.5 rounded-md transition-colors"
-                    >
-                      <span className="truncate max-w-[120px] sm:max-w-[180px]">{src.title}</span>
-                      <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-60" />
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* View Mode Switching */}
-            {viewMode === 'card' ? (
-              <div className="space-y-4">
-                {curationData.articles.map((article, idx) => {
-                  const isBookmarked = bookmarks.some(
-                    (b) => b.id === article.id && b.keyword === curationData.keyword
-                  );
-                  return (
-                    <ArticleCard
-                      key={article.id || idx}
-                      article={article}
-                      index={idx}
-                      isBookmarked={isBookmarked}
-                      onToggleBookmark={handleToggleBookmark}
-                      onNotify={showToast}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <MarkdownView data={curationData} onNotify={showToast} />
-            )}
+            {curationData.articles.map((article, idx) => {
+              const isBookmarked = bookmarks.some(
+                (b) => b.id === article.id && b.keyword === curationData.keyword
+              );
+              return (
+                <ArticleCard
+                  key={article.id || idx}
+                  article={article}
+                  index={idx}
+                  isBookmarked={isBookmarked}
+                  onToggleBookmark={handleToggleBookmark}
+                  onNotify={showToast}
+                />
+              );
+            })}
           </div>
         )}
       </main>
