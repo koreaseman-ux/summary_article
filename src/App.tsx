@@ -17,71 +17,8 @@ import { MobileConnectModal } from './components/MobileConnectModal.tsx';
 import { Toast } from './components/Toast.tsx';
 import { CurationData, Article, BookmarkArticle } from './types.ts';
 
-const INITIAL_DATA: CurationData = {
-  keyword: '소프트웨어 공학 AI 트렌드',
-  searchDate: new Date().toISOString().split('T')[0],
-  modelUsed: 'Gemini 3.5 / 3.1 Flash-Lite (내용 중요도 평가 엔진)',
-  totalFoundCount: 15,
-  overallSummary: '소프트웨어 엔지니어링 생태계는 단순 코드 자동 완성을 넘어 에이전틱 AI(Agentic AI)와 자율적 리팩토링, 테스트 자동화 도구로 급격히 진화하고 있습니다. 개발자의 역할은 반복 코딩에서 시스템 아키텍처 설계와 AI 에이전트 오케스트레이션으로 재정의되고 있습니다.',
-  articles: [
-    {
-      id: 1,
-      title: '📌 2026년 소프트웨어 공학의 대전환: "단순 코딩 보조에서 자율 에이전틱 워크플로우로"',
-      summary: '최신 소프트웨어 개발 환경에서는 단순한 인라인 자동완성을 넘어 개발 이슈를 읽고 테스트 작성, 버그 수정, PR 생성까지 스스로 수행하는 에이전틱 워크플로우가 핵심 트렌드로 부상하고 있습니다. 개발팀은 반복 작업에 소요되는 시간을 대폭 줄이고 복잡한 도메인 모델링과 비즈니스 가치 창출에 집중하는 추세입니다. 테스트 주도 개발(TDD)과 코드 리뷰 파이프라인 전반에 AI 감사가 기본 탑재되고 있습니다.',
-      importanceScore: 99,
-      importanceReason: '소프트웨어 엔지니어링 패러다임 전환과 에이전틱 AI 실무 확산의 최고 영향력 기사',
-      keyPoints: [
-        '에이전틱 AI 도구가 단위 테스트 자동 생성 및 엣지 케이스 탐지를 주도',
-        'CI/CD 파이프라인과 통합되어 빌드 오류를 스스로 수정 후 재배포 제안',
-        '엔지니어의 핵심 역량이 프롬프트 엔지니어링에서 오케스트레이션 아키텍처로 진화'
-      ],
-      url: 'https://zdnet.co.kr',
-      source: 'ZDNet Korea',
-      publishedDate: '2026-09-20',
-      categoryTag: '소프트웨어 공학'
-    },
-    {
-      id: 2,
-      title: '📌 대규모 엔터프라이즈 레거시 코드 현대화에 투입되는 생성형 AI 솔루션',
-      summary: '수십 년 된 모놀리식 아키텍처와 구형 언어(COBOL, Java 8 등)로 작성된 대규모 금융 및 기간계 시스템을 클라우드 네이티브 마이크로서비스로 전환하는 데 생성형 AI가 핵심 동력으로 자리 잡았습니다. 정적 분석 도구와 LLM이 결합하여 코드의 숨겨진 비즈니스 룰을 자동 추출하고 마이그레이션 안전성을 검증합니다. 이를 통해 마이그레이션 리스크와 프로젝트 소요 기간을 종전 대비 40% 이상 절감하고 있습니다.',
-      importanceScore: 96,
-      importanceReason: '금융·엔터프라이즈의 레거시 현대화 및 비용 절감 사례로 실무 적용 가치 우수',
-      keyPoints: [
-        '수백만 줄의 레거시 코드를 컨텍스트 윈도우 확장을 통해 통합 분석',
-        '비즈니스 로직 손실 없는 마이크로서비스 API 스펙 자동 추출',
-        '인간 아키텍트의 승인 루프를 거치는 Human-in-the-Loop 검증 체계 확립'
-      ],
-      url: 'https://www.etnews.com',
-      source: '전자신문',
-      publishedDate: '2026-09-18',
-      categoryTag: '클라우드 & 아키텍처'
-    },
-    {
-      id: 3,
-      title: '📌 AI 생성 코드 시대의 새로운 과제: 소프트웨어 공급망 보안과 코드 거버넌스',
-      summary: 'AI가 생성한 코드 도입이 폭발적으로 늘어나면서 오픈소스 라이선스 위반 위험, 할루시네이션으로 인한 보안 취약점, 비밀번호 유출 등을 사전 차단하는 AI 거버넌스 플랫폼이 필수 인프라가 되었습니다. 주요 기술 기업들은 커밋 단계에서부터 AI 생성 여부와 잠재적 취약점을 정밀 스캔하는 제로 트러스트 코드 보안 파이프라인을 구축하고 있습니다. 규제 준수(Compliance)와 모델 투명성이 기업의 핵심 평가 기준으로 부각되고 있습니다.',
-      importanceScore: 94,
-      importanceReason: 'AI 코드 생성 급증에 따른 공급망 보안 및 규제 대응 필수 가이드라인',
-      keyPoints: [
-        'AI 생성 코드에 대한 실시간 취약점(SAST/DAST) 자동 진단 의무화',
-        '오픈소스 라이선스 준수 여부를 검사하는 소프트웨어 자재명세서(SBOM) 자동화',
-        '개발팀 내 AI 도구 사용 규정 및 데이터 프라이버시 보호 가이드라인 표준화'
-      ],
-      url: 'https://byline.network',
-      source: '바이라인네트워크',
-      publishedDate: '2026-09-15',
-      categoryTag: '보안 & 거버넌스'
-    }
-  ],
-  groundingSources: [
-    { title: 'ZDNet Korea 소프트웨어 엔지니어링 트렌드', url: 'https://zdnet.co.kr' },
-    { title: '전자신문 테크 리포트', url: 'https://www.etnews.com' },
-    { title: '바이라인네트워크 IT 심층 분석', url: 'https://byline.network' }
-  ]
-};
-
 export default function App() {
-  const [curationData, setCurationData] = useState<CurationData>(INITIAL_DATA);
+  const [curationData, setCurationData] = useState<CurationData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingStep, setLoadingStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +27,9 @@ export default function App() {
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('recent_searches');
-      return saved ? JSON.parse(saved) : ['소프트웨어 공학 AI 트렌드', '자율주행', '양자컴퓨터'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['소프트웨어 공학 AI 트렌드', '자율주행'];
+      return [];
     }
   });
 
@@ -189,6 +126,7 @@ export default function App() {
 
   // Bookmarks toggle
   const handleToggleBookmark = (art: Article) => {
+    if (!curationData) return;
     const exists = bookmarks.some((b) => b.id === art.id && b.keyword === curationData.keyword);
     if (exists) {
       setBookmarks((prev) => prev.filter((b) => !(b.id === art.id && b.keyword === curationData.keyword)));
@@ -310,7 +248,12 @@ export default function App() {
               <p className="mt-0.5">{error}</p>
             </div>
             <button
-              onClick={() => handleSearch(curationData.keyword)}
+              onClick={() => {
+                const targetKeyword = curationData?.keyword || recentSearches[0];
+                if (targetKeyword) {
+                  handleSearch(targetKeyword);
+                }
+              }}
               className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium text-xs shrink-0 transition-colors"
             >
               다시 시도
