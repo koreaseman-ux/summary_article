@@ -1,17 +1,13 @@
 import React from 'react';
-import { Sparkles, Code2, Bookmark, Newspaper, Smartphone } from 'lucide-react';
+import { Sparkles, Bookmark, Newspaper } from 'lucide-react';
 
 interface HeaderProps {
-  onOpenApiGuide: () => void;
   onOpenBookmarks: () => void;
-  onOpenMobileConnect: () => void;
   bookmarkCount: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onOpenApiGuide,
   onOpenBookmarks,
-  onOpenMobileConnect,
   bookmarkCount,
 }) => {
   return (
@@ -39,25 +35,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Mobile Test Link Button */}
-          <button
-            onClick={onOpenMobileConnect}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200/80 shadow-2xs"
-            title="스마트폰에서 테스트하기"
-          >
-            <Smartphone className="w-3.5 h-3.5 text-indigo-600" />
-            <span>모바일 테스트 링크</span>
-          </button>
-
-          <button
-            onClick={onOpenApiGuide}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70"
-            title="웹앱 구현 및 API 연동 가이드"
-          >
-            <Code2 className="w-3.5 h-3.5 text-slate-600" />
-            <span>구현 가이드</span>
-          </button>
-
           <button
             onClick={onOpenBookmarks}
             className="relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200/70"
@@ -76,3 +53,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

@@ -69,7 +69,7 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
           ) : (
             <>
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span>분석</span>
+              <span>검색</span>
             </>
           )}
         </button>

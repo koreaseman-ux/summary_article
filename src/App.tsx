@@ -151,9 +151,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 pb-16">
       {/* Sticky Top Header */}
       <Header
-        onOpenApiGuide={() => setIsApiGuideOpen(true)}
         onOpenBookmarks={() => setIsBookmarksOpen(true)}
-        onOpenMobileConnect={() => setIsMobileConnectOpen(true)}
         bookmarkCount={bookmarks.length}
       />
 
