@@ -25,7 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
-                AI 뉴스 브리프
+                관심 뉴스 탑3
               </h1>
               <span className="hidden sm:inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100">
                 <Sparkles className="w-3 h-3" /> Top 3 큐레이터

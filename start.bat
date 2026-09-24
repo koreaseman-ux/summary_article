@@ -2,7 +2,7 @@
 chcp 65001 > nul
 set "PATH=%PATH%;C:\Program Files\nodejs"
 echo ===================================================
-echo   기사 요약 AI 애플리케이션 (Summary Article App)
+echo   관심 뉴스 탑3 (Summary Article App)
 echo ===================================================
 echo.
 echo 서버를 시작합니다...

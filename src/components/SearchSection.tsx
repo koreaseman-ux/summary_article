@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, X, Loader2, TrendingUp, History, Sparkles } from 'lucide-react';
+import { Search, X, Loader2, History, Sparkles } from 'lucide-react';
 
 interface SearchSectionProps {
   onSearch: (keyword: string) => void;
@@ -8,15 +8,6 @@ interface SearchSectionProps {
   onSelectRecent: (keyword: string) => void;
   onClearRecent: (keyword?: string) => void;
 }
-
-const RECOMMENDED_TOPICS = [
-  '소프트웨어 공학 AI 트렌드',
-  '생성형 AI 반도체 혁신',
-  'LLM 에이전트 실무 구축',
-  '온디바이스 AI 시장 동향',
-  '2026 프론트엔드 아키텍처',
-  '자율주행 최신 기술'
-];
 
 export const SearchSection: React.FC<SearchSectionProps> = ({
   onSearch,
@@ -49,7 +40,7 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
           type="text"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="관심 주제 또는 키워드 입력 (예: 소프트웨어 공학 AI 트렌드)"
+          placeholder="관심 주제 또는 키워드 입력 (예: 하이닉스 주가)"
           className="w-full pl-10 sm:pl-12 pr-24 sm:pr-28 py-3 sm:py-3.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-sm sm:text-base text-slate-900 placeholder:text-slate-400 rounded-xl border border-slate-200 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
           disabled={isLoading}
         />
@@ -83,36 +74,6 @@ export const SearchSection: React.FC<SearchSectionProps> = ({
           )}
         </button>
       </form>
-
-      {/* Suggested Keywords */}
-      <div className="mt-3.5 pt-3 border-t border-slate-100">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-            <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
-            <span>추천 인기 키워드</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          {RECOMMENDED_TOPICS.map((topic) => {
-            const isPrimary = topic === '소프트웨어 공학 AI 트렌드';
-            return (
-              <button
-                key={topic}
-                onClick={() => handleChipClick(topic)}
-                disabled={isLoading}
-                className={`text-xs px-2.5 sm:px-3 py-1.5 rounded-lg border transition-all text-left flex items-center gap-1 ${
-                  isPrimary
-                    ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900 font-medium hover:bg-indigo-100'
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200/80 text-slate-700 font-normal'
-                }`}
-              >
-                {isPrimary && <span className="text-indigo-600 text-[10px]">★</span>}
-                {topic}
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Recent Searches */}
       {recentSearches.length > 0 && (
